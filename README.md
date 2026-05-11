@@ -2,6 +2,8 @@
 
 Originally by Gibsi Kim et al, modified for Oakton's Autonomous Racing club to accept YDLidar G4 scans and perform map building & path planning.
 
+Includes control loop interfacing with Arduino Nano, BNO055, and BTS7960 to adjust motor power.
+
 See the original project description below:
 
 Full-python LiDAR SLAM.
