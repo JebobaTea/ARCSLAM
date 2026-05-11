@@ -14,6 +14,7 @@ from utils.ScanContextManager import *
 from utils.PoseGraphManager import *
 from utils.UtilsMisc import *
 from utils.MapManager import *
+from utils.Control import Vehicle
 # from utils.Scanner import *
 import utils.UtilsPointcloud as Ptutils
 import utils.ICP as ICP
@@ -22,8 +23,9 @@ import open3d as o3d
 # params
 parser = argparse.ArgumentParser(description='PyICP SLAM arguments')
 
-# roughly 500 points can be expected
-parser.add_argument('--num_icp_points', type=int, default=2500) # 5000 is enough for real time
+# roughly 400 points can be expected
+# TODO: handle cases where 400 pts not guaranteed
+parser.add_argument('--num_icp_points', type=int, default=400) # 5000 is enough for real time
 parser.add_argument('--num_rings', type=int, default=20) # same as the original paper
 parser.add_argument('--num_sectors', type=int, default=60) # same as the original paper
 parser.add_argument('--num_candidates', type=int, default=10) # must be int
@@ -36,6 +38,7 @@ parser.add_argument('--save_gap', type=int, default=1)
 parser.add_argument('--use_open3d', action='store_true')
 base_result_dir = "POSE/"
 icp_tries = 50
+clip_prec = 1
 icp_tolerance = 0.00000001
 
 args = parser.parse_args()
@@ -53,19 +56,22 @@ def homogenize(victim):
 # Result saver
 save_dir = base_result_dir + args.sequence_idx
 if not os.path.exists(save_dir): os.makedirs(save_dir)
-ResultSaver = PoseGraphResultSaver(init_pose=PGM.curr_se3, 
+ResultSaver = PoseGraphResultSaver(init_pose=PGM.curr_se3,
                              save_gap=args.save_gap,
                              num_frames=-1,
                              seq_idx=args.sequence_idx,
                              save_dir=save_dir)
 
 # Scan Context Manager (for loop detection) initialization
-SCM = ScanContextManager(shape=[args.num_rings, args.num_sectors], 
-                                        num_candidates=args.num_candidates, 
+SCM = ScanContextManager(shape=[args.num_rings, args.num_sectors],
+                                        num_candidates=args.num_candidates,
                                         threshold=args.loop_threshold)
 
 # mapping class
-world = World(clip_prec=1, start_weight=8, cull_threshold=10000)
+world = World(clip_prec=clip_prec, start_weight=8, cull_threshold=10000)
+
+# used to apply controls
+vehicle = Vehicle()
 
 # init lidar
 # scanner = YDScanner()
@@ -143,6 +149,12 @@ while True:
     # add the odometry factor to the graph
     PGM.addOdometryFactor(odom_transform)
 
+    # apply controls
+    vehicle_pos = [odom_transform[4], odom_transform[8], odom_transform[12]]
+    wpts = world.grid.generateWaypoints(world.clip(odom_transform[4]), world.clip(odom_transform[8]), 24, -14)
+    vehicle.replace_waypoints(wpts, clip_prec)
+    vehicle.drive(vehicle_pos)
+
     # renewal the prev information
     PGM.prev_node_idx = PGM.curr_node_idx
     prev_scan_pts = copy.deepcopy(curr_scan_pts)
@@ -172,9 +184,9 @@ while True:
     print()
     for_idx += 1
 
-world.export("world/")
-wa = world.grid.generateWaypoints(-24, 50, 24, -14)
-with open("path.npz", "wb+") as f:
-    np.save(f, np.array(wa))
+# world.export("world/")
+# wa = world.grid.generateWaypoints(-24, 50, 24, -14)
+# with open("path.npz", "wb+") as f:
+#    np.save(f, np.array(wa))
 
 # scanner.deactivate()

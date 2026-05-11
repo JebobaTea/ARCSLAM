@@ -10,7 +10,7 @@ np.set_printoptions(precision=4)
 from utils.UtilsMisc import *
 
 class World:
-    def __init__(self, clip_prec=4, start_weight=4096, cull_threshold=10000):
+    def __init__(self, clip_prec=1, start_weight=8, cull_threshold=10000):
         self.pose = None
         self.clip_prec = clip_prec
         self.raw_points = None
@@ -134,7 +134,7 @@ class CellGrid:
             framecount += 1
 
             # debug
-            if curr_cell.weight > 256:
+            if curr_cell.weight > 4:
                 print(f"Why are we navigating here: {curr_cell.x}, {curr_cell.y} | {curr_cell.weight} + {curr_cell.f} + {curr_cell.h}")
 
             if curr_cell in visited:
@@ -189,7 +189,7 @@ class CellGrid:
                     heappush(pq, (fn, hn + random.random(), neighbor))
                     modified.add(neighbor)
         print("No path found")
-        flush(modified)
+        self.flush(modified)
 
     def flush(self, modded):
         for cell in modded:

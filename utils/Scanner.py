@@ -6,7 +6,7 @@ def polar_to_2d(sc):
     for pt in sc:
         dist = pt[1]
         rad = pt[0]
-        x = dist * np.cos(rad)
+        x = dist * np.cos(rad) * -1 # for some reason, x values are inverted
         y = dist * np.sin(rad)
         cartesian_pts.append([x, y])
     return np.array(cartesian_pts)
@@ -77,6 +77,6 @@ class YDScanner:
         return True
 
     def deactivate(self):
-        laser.turnOff()
-        laser.disconnecting()
+        self.laser.turnOff()
+        self.laser.disconnecting()
         print("Lidar shutdown")
