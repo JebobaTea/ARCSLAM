@@ -19,7 +19,6 @@ class World:
         self.cull_threshold = cull_threshold
 
     def update(self, pts):
-        tstart = time.process_time()
         print("Running update operation")
         if self.raw_points is None:
             self.raw_points = pts
@@ -134,8 +133,8 @@ class CellGrid:
             framecount += 1
 
             # debug
-            if curr_cell.weight > 4:
-                print(f"Why are we navigating here: {curr_cell.x}, {curr_cell.y} | {curr_cell.weight} + {curr_cell.f} + {curr_cell.h}")
+            #if curr_cell.weight > 8:
+            #    print(f"Why are we navigating here: {curr_cell.x}, {curr_cell.y} | {curr_cell.weight} + {curr_cell.f} + {curr_cell.h}")
 
             if curr_cell in visited:
                 continue
@@ -148,21 +147,22 @@ class CellGrid:
                     curr_cell.parent = curr_cell
             visited.add(curr_cell)
             # visualization for debugging
-            if vis and framecount % skip == 0:
+            if vis:
                 pt = np.vstack((pt, [curr_cell.x, curr_cell.y]))
-                plt.clf()
-                data = np.load("world/pixels.npz")
-                cp = []
-                for i in data[:]:
-                    if i[2] == 0:
-                        continue
-                    i[2] = math.sqrt(i[2])
-                    i[2] /= 64
-                    cp.append([i[0], i[1], i[2]])
-                cp = np.array(cp)
-                plt.scatter(cp[:, 0], cp[:, 1], s=4, c=cp[:, 2], cmap="gray_r")
-                plt.scatter(pt[:, 0], pt[:, 1], s=4, c="red")
-                plt.pause(0.01)
+                if framecount % skip == 0:
+                    plt.clf()
+                    data = np.load("world/pixels.npz")
+                    cp = []
+                    for i in data[:]:
+                        if i[2] == 0:
+                            continue
+                        i[2] = math.sqrt(i[2])
+                        i[2] /= 64
+                        cp.append([i[0], i[1], i[2]])
+                    cp = np.array(cp)
+                    plt.scatter(cp[:, 0], cp[:, 1], s=4, c=cp[:, 2], cmap="gray_r")
+                    plt.scatter(pt[:, 0], pt[:, 1], s=4, c="red")
+                    plt.pause(0.01)
             # print("Visiting " + str(curr_cell.x) + ", " + str(curr_cell.y))
 
             for neighbor in self.getNeighbors(curr_cell, curr_cell):

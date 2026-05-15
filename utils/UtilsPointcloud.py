@@ -4,15 +4,19 @@ import numpy as np
 
 def random_sampling(orig_points, num_points):
     # assert orig_points.shape[0] > num_points
+    ptsfinal = np.copy(orig_points)
+    # force suppress insufficient points
+    if (orig_points.shape[0] < num_points):
+        # randomly clone existing points until threshold reached
+        duplicates = orig_points[np.random.randint(orig_points.shape[0], size=(num_points - orig_points.shape[0] + 1)), :]
+        ptsfinal = np.vstack((ptsfinal, duplicates))
+    points_down_idx = random.sample(range(ptsfinal.shape[0]), num_points)
+    down_points = ptsfinal[points_down_idx, :]
+    return down_points
 
-    if (orig_points.shape[0] > num_points):
-        points_down_idx = random.sample(range(orig_points.shape[0]), num_points)
-        down_points = orig_points[points_down_idx, :]
-        return down_points
+    # print("Insufficient points: " + str(orig_points.shape[0]))
 
-    print("Insufficient points: " + str(orig_points.shape[0]))
-
-    return []
+    # return []
 
 # force add Z, for now
 def readScan(bin_path):
