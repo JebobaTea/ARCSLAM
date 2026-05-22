@@ -41,10 +41,10 @@ void loop() {
 
     if (PWM_F_B > 0) {
         analogWrite(LPWM_PIN_B, 0);
-        analogWrite(RPWM_PIN_B, PWM_F_B / 2);
+        analogWrite(RPWM_PIN_B, PWM_F_B);
     } else {
         // forward
-        analogWrite(LPWM_PIN_B, PWM_B_B / 2);
+        analogWrite(LPWM_PIN_B, PWM_B_B);
         analogWrite(RPWM_PIN_B, 0);
     }
 }
