@@ -6,11 +6,11 @@
 byte data[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 // no enable pins because they are connected directly to 5V
-int LPWM_PIN_A = 6
-int RPWM_PIN_A = 5
+int LPWM_PIN_A = 6;
+int RPWM_PIN_A = 5;
 
-int LPWM_PIN_B = 10
-int RPWM_PIN_B = 9
+int LPWM_PIN_B = 10;
+int RPWM_PIN_B = 9;
 
 void setup() 
 {
