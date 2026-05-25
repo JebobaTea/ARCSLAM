@@ -9,8 +9,9 @@ See our technical writeup at [COMING SOON].
   [Hardware Lead / Design / Assembly] @PotlinH
   [Hardware / Assembly] CM Huang
   [Hardware / Assembly] CJ Huang
-  [Hardware / Assembly ] B Li
-  [Software] @WhosArjun
+  [Hardware / Assembly] B Li
+
+  [+ additional supporting members] @WhosArjun, V Bao
 ```
 
 
