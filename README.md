@@ -9,7 +9,7 @@ See our technical writeup at [COMING SOON].
   [Hardware Lead / Design / Assembly] @PotlinH
   [Hardware / Assembly] CM Huang
   [Hardware / Assembly] CJ Huang
-  [Software / Testing] B Li
+  [Hardware / Assembly ] B Li
   [Software] @WhosArjun
 ```
 
