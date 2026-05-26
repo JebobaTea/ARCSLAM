@@ -14,11 +14,10 @@ from utils.ScanContextManager import *
 from utils.PoseGraphManager import *
 from utils.UtilsMisc import *
 from utils.MapManager import *
-# from utils.Control import Vehicle
-# from utils.Scanner import *
+from utils.Control import Vehicle
+from utils.Scanner import *
 import utils.UtilsPointcloud as Ptutils
 import utils.ICP as ICP
-import open3d as o3d
 
 # params
 parser = argparse.ArgumentParser(description='PyICP SLAM arguments')
@@ -30,16 +29,18 @@ parser.add_argument('--num_rings', type=int, default=20) # same as the original 
 parser.add_argument('--num_sectors', type=int, default=60) # same as the original paper
 parser.add_argument('--num_candidates', type=int, default=10) # must be int
 parser.add_argument('--try_gap_loop_detection', type=int, default=10) # same as the original paper
-parser.add_argument('--loop_threshold', type=float, default=0.11) # 0.11 is usually safe (for avoiding false loop closure)
+parser.add_argument('--loop_threshold', type=float, default=0.07) # 0.11 is usually safe (for avoiding false loop closure)
 parser.add_argument('--data_dir', type=str,
                     default='data/')
 parser.add_argument('--sequence_idx', type=str, default='00')
 parser.add_argument('--save_gap', type=int, default=1)
-parser.add_argument('--use_open3d', action='store_true')
+
 base_result_dir = "POSE/"
 icp_tries = 50
 clip_prec = 1
 icp_tolerance = 0.00000001
+targx = 25
+targy = 0
 
 args = parser.parse_args()
 
@@ -71,33 +72,39 @@ SCM = ScanContextManager(shape=[args.num_rings, args.num_sectors],
 world = World(clip_prec=clip_prec, start_weight=8, cull_threshold=10000)
 
 # used to apply controls
-# vehicle = Vehicle()
+vehicle = Vehicle()
 
 # init lidar
-# scanner = YDScanner()
-# if not scanner.activate():
-#    raise RuntimeError("Lidar did not wake up, check USB and init parameters")
+scanner = YDScanner(rep=2)
+if not scanner.activate():
+    raise RuntimeError("Lidar did not wake up, check USB and init parameters")
 
 # @@@ MAIN @@@: data stream
 for_idx = 0
+clk = time.time()
 while True:
     try:
+        if time.time() - clk < 0.1:
+            continue
+        else:
+            clk = time.time()
         # testing placeholder
-        if for_idx > 8:
-            break
+        #if for_idx > 8:
+        #    break
 
-        print(f"Reading scan no. {for_idx}, starting timer (measured in process time)")
+        #print(f"Reading scan no. {for_idx}, starting timer (measured in process time)")
         tstart = time.process_time()
         # grab scan, currently placeholder for lidar scan call
-        curr_scan_pts = Ptutils.readScan(f"data/{for_idx}.npz")
+        #curr_scan_pts = Ptutils.readScan(f"../SCAN0/c_{for_idx}.npz")
 
         # actual data
-        # _, curr_scan_pts = scanner.run_scan()
-
+        _, curr_scan_pts = scanner.run_scan()
+        
         curr_scan_down_pts = Ptutils.random_sampling(curr_scan_pts, num_points=args.num_icp_points)
-        if not curr_scan_down_pts.all():
-            for_idx += 1
-            continue
+        
+        #if not curr_scan_down_pts.all():
+        #    for_idx += 1
+        #    continue
         # save current node
         PGM.curr_node_idx = for_idx # make start with 0
         SCM.addNode(node_idx=PGM.curr_node_idx, ptcloud=curr_scan_down_pts)
@@ -106,33 +113,18 @@ while True:
             prev_scan_pts = copy.deepcopy(curr_scan_pts)
             icp_initial = np.eye(4)
             for_idx += 1
+            print("c")
             continue
 
         dnn = None
         prev_scan_down_pts = Ptutils.random_sampling(prev_scan_pts, num_points=args.num_icp_points)
 
-        print("Read & downsampling complete: time since start is " + str(time.process_time() - tstart))
-        if args.use_open3d: # calc odometry using open3d
-            #print("Using Open3D")
-            source = o3d.geometry.PointCloud()
-            source.points = o3d.utility.Vector3dVector(curr_scan_down_pts)
+        #print("Read & downsampling complete: time since start is " + str(time.process_time() - tstart))
 
-            target = o3d.geometry.PointCloud()
-            target.points = o3d.utility.Vector3dVector(prev_scan_down_pts)
+        #print("Using custom ICP")
+        odom_transform, dnn, _ = ICP.icp(curr_scan_down_pts, prev_scan_down_pts, init_pose=icp_initial, max_iterations=icp_tries, tolerance=icp_tolerance)
 
-            reg_p2p = o3d.pipelines.registration.registration_icp(
-                                                                source = source,
-                                                                target = target,
-                                                                max_correspondence_distance = 0.5,
-                                                                init = icp_initial,
-                                                                estimation_method = o3d.pipelines.registration.TransformationEstimationPointToPoint(), criteria = o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=20)
-                                                                )
-            odom_transform = reg_p2p.transformation
-        else:   # calc odometry using custom ICP
-            #print("Using custom ICP")
-            odom_transform, dnn, _ = ICP.icp(curr_scan_down_pts, prev_scan_down_pts, init_pose=icp_initial, max_iterations=icp_tries, tolerance=icp_tolerance)
-
-        print("ICP complete: time since start is " + str(time.process_time() - tstart))
+        #print("ICP complete: time since start is " + str(time.process_time() - tstart))
         # update the current (moved) pose
         PGM.curr_se3 = np.matmul(PGM.curr_se3, odom_transform)
         icp_initial = odom_transform # assumption: constant velocity model (for better next ICP converges)
@@ -144,19 +136,22 @@ while True:
         transformed = transformed.T
         base = base.T
 
-        print("Starting map build operation")
+        #print("Starting map build operation")
         world.update(transformed)
-        print("Map built & propagated in " + str(time.process_time() - tstart))
+        #print("Map built & propagated in " + str(time.process_time() - tstart))
         # add the odometry factor to the graph
         PGM.addOdometryFactor(odom_transform)
 
         # apply controls
-        vehicle_pos = [odom_transform[0][3], odom_transform[1][3], odom_transform[2][3]]
-        wpts = world.grid.generateWaypoints(world.clip(odom_transform[0][3]), world.clip(odom_transform[1][3]), 24, -14)
+        #print(odom_transform)
+        vehicle_pos = [pose[0][3], pose[1][3], pose[2][3]]
+        print("Current position: " + str(vehicle_pos))
+        wpts = world.grid.generateWaypoints(world.clip(pose[0][3]), world.clip(pose[1][3]), targx, targy)
         # wpts = world.grid.generateWaypoints(-20, 50, 24, -14)
         # ideally, slice waypoints ::4 for smoother path
-        # vehicle.replace_waypoints(wpts, clip_prec)
-        # vehicle.drive(vehicle_pos)
+        print(wpts)
+        vehicle.replace_waypoints(wpts[::4], clip_prec)
+        vehicle.drive(vehicle_pos)
 
         # renewal the prev information
         PGM.prev_node_idx = PGM.curr_node_idx
@@ -183,19 +178,20 @@ while True:
 
         # save the ICP odometry pose result (no loop closure)
         ResultSaver.saveUnoptimizedPoseGraphResult(PGM.curr_se3, PGM.curr_node_idx)
-        print("Loop closure and final I/O complete, full iteration took " + str(time.process_time() - tstart))
+        #print("Loop closure and final I/O complete, full iteration took " + str(time.process_time() - tstart))
         print()
         for_idx += 1
     except KeyboardInterrupt:
-        # scanner.deactivate()
-        pass
-    finally:
-        # scanner.deactivate()
-        pass
+        print("Attempting to kill")
+        scanner.deactivate()
+        vehicle.kill()
+        world.export("world/")
+        print("Killed")
 
 #world.export("world/")
 #wa = world.grid.generateWaypoints(-24, 50, 24, -14)
 #with open("path.npz", "wb+") as f:
 #    np.save(f, np.array(wa))
 
-# scanner.deactivate()
+scanner.deactivate()
+vehicle.kill()
