@@ -8,7 +8,7 @@ def polar_to_2d(sc):
         rad = pt[0]
         x = dist * np.cos(rad) * -1 # for some reason, x values are inverted
         y = dist * np.sin(rad)
-        cartesian_pts.append([x, y])
+        cartesian_pts.append([x, y, 0])
     return np.array(cartesian_pts)
 
 class YDScanner:
@@ -37,20 +37,20 @@ class YDScanner:
         self.laser.setlidaropt(ydlidar.LidarPropSingleChannel, False)
 
     def get_raw_scan(self, n=1):
-        print("Starting scan, performing " + str(n) + " rotations")
+        #print("Starting scan, performing " + str(n) + " rotations")
         polar_pts = []
         for i in range(n):
             scan = ydlidar.LaserScan()
             r = self.laser.doProcessSimple(scan)
             if r:
-                print("Successful scan start for no. " + str(i))
+                #print("Successful scan start for no. " + str(i))
                 for point in scan.points:
                     # ignore invalid measurements
                     if (point.range < 0.005):
                         continue
                     polar_pts.append([point.angle, point.range])
             else:
-                print("Scan failure")
+                #print("Scan failure")
                 return [[]]
         return np.array(polar_pts)
 
