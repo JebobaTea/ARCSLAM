@@ -14,17 +14,13 @@ def dist_euclid(x1, y1, x2, y2):
 def normalize_rad(rad : float):
     return (rad + np.pi) % (2 * np.pi) - np.pi
 
-def filter_waypoints(location : np.ndarray, current_idx: int, waypoints) -> int:
+def filter_waypoints(location, current_idx, waypoints) -> int:
     # waypoints no longer in roar_py format, so [x, y]
-    def dist_to_waypoint(waypoint):
-        return np.linalg.norm(
-            location[:2] - waypoint[:2]
-        )
     # TODO: pray that this works
-    for i in range(current_idx, len(waypoints) + current_idx):
+    for i in range(current_idx, len(waypoints)):
         # TODO: find appropriate threshold
-        if dist_to_waypoint(waypoints[i%len(waypoints)]) < 0.1:
-            return i % len(waypoints)
+        if dist_euclid(location[0], location[1], waypoints[i][0], waypoints[i][1])  < 0.1:
+            return i
     return current_idx
 
 class Vehicle:
@@ -34,6 +30,7 @@ class Vehicle:
         self.i2c = board.I2C()
         self.location = None
         self.rotation = None
+        self.long_ctrl = 0
         self.last_time = time.time()
         self.sensor = adafruit_bno055.BNO055_I2C(self.i2c)
         self.sensor.mode = adafruit_bno055.IMUPLUS_MODE
@@ -77,26 +74,39 @@ class Vehicle:
         }
         return conf
 
-    def control_to_bytes(self, steer, throttle, brake=0):
-        throttle *= 256
+    def control_to_bytes(self, steer, target_ctrl, debug=False):
+        d_throt = target_ctrl - self.long_ctrl
+        throt_step = d_throt/10
+        self.long_ctrl += throt_step
+        throttle = self.long_ctrl * 256
         throttle = int(throttle)
         if throttle > 255:
             # insurance for if my math is off
             throttle = 255
-        # should now be clipped to 0, 255
+        if throttle < -255:
+            throttle = -255
+        # should now be clipped to -255, 255
         throttle_strong = throttle
-        throttle_weak = int(throttle * (1 - steer))
+        throttle_weak = int(throttle * (1 - abs(steer)))
         # byte 0: forward A, byte 1: backward A, byte 2: forward B, byte 3: backward B
         # steer < 0 --> left, steer > 0 --> right
+        if debug:
+            print(throttle)
+        control = []
         if steer > 0:
-            control = []
-            # for right turn, weaken right-side throttle by factor of 1 - steer
-            # side A --> L convention
-            control = [throttle_strong, 0x00, throttle_weak, 0x00, 0x00, 0x00, 0x00, 0x00]
+            if throttle > 0:
+                # for right turn, weaken right-side throttle by factor of 1 - steer
+                # side A --> L convention
+                control = [throttle_strong, 0x00, throttle_weak, 0x00, 0x00, 0x00, 0x00, 0x00]
+            else:
+                # induce weaker braking on the side that requires more power
+                control = [0x00, -throttle_weak, 0x00, -throttle_strong, 0x00, 0x00, 0x00, 0x00]
         else:
-            # left turn: weaken right-side throttle (side B)
-            control = [throttle_weak, 0x00, throttle_strong, 0x00, 0x00, 0x00, 0x00, 0x00]
-
+            if throttle > 0:
+                # left turn: weaken right-side throttle (side B)
+                control = [throttle_weak, 0x00, throttle_strong, 0x00, 0x00, 0x00, 0x00, 0x00]
+            else:
+                control = [0x00, -throttle_strong, 0x00, -throttle_weak, 0x00, 0x00, 0x00, 0x00]
         return bytes(control)
 
     def send_signal(self, signal):
@@ -112,7 +122,7 @@ class Vehicle:
         finally:
             self.i2c.unlock()
 
-    def drive(self, odom_transform):
+    def drive(self, odom_transform, deft=0.1):
         new_time = time.time()
         self.location = odom_transform
         # constant time assumption does not hold
@@ -140,12 +150,19 @@ class Vehicle:
         steer = self.lat_pid_controller.run_in_series(
             self.location, self.rotation, vehicle_speed, waypoint_to_follow
         )
-        throttle = 0.1
+        throttle = deft
+        if (vehicle_speed > 0.1):
+            throttle = 0
         self.send_signal(self.control_to_bytes(steer, throttle))
 
         self.location_buffer.append(odom_transform)
         self.last_time = new_time
 
+    def kill(self):
+        for i in range(30):
+            self.send_signal(self.control_to_bytes(0, 0))
+            time.sleep(0.05)
+        self.send_signal(bytes([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]))
 
 class LatPIDController():
     def __init__(self, config: dict, dt: float = 0.05):
