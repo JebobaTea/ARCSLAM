@@ -40,8 +40,7 @@ icp_tries = 50
 clip_prec = 1
 icp_tolerance = 0.00000001
 targx = 25
-targy = 0
-
+targy = 15
 args = parser.parse_args()
 
 # Pose Graph Manager (for back-end optimization) initialization
@@ -146,11 +145,13 @@ while True:
         #print(odom_transform)
         vehicle_pos = [pose[0][3], pose[1][3], pose[2][3]]
         print("Current position: " + str(vehicle_pos))
-        wpts = world.grid.generateWaypoints(world.clip(pose[0][3]), world.clip(pose[1][3]), targx, targy)
-        # wpts = world.grid.generateWaypoints(-20, 50, 24, -14)
-        # ideally, slice waypoints ::4 for smoother path
-        print(wpts)
-        vehicle.replace_waypoints(wpts[::4], clip_prec)
+        if (for_idx < 5 or for_idx % 3 == 0):
+            wpts = world.grid.generateWaypoints(world.clip(pose[0][3]), world.clip(pose[1][3]), targx, targy)
+            # wpts = world.grid.generateWaypoints(-20, 50, 24, -14)
+            # ideally, slice waypoints ::4 for smoother path
+            print(wpts)
+
+            vehicle.replace_waypoints(wpts[::4], clip_prec)
         vehicle.drive(vehicle_pos)
 
         # renewal the prev information
