@@ -53,17 +53,17 @@ class Vehicle:
         conf = {
             "1": {
                 "Kp": 0.7,
-                "Kd": 0.05,
+                "Kd": 0.1,
                 "Ki": 0.05
             },
             "3": {
                 "Kp": 0.7,
-                "Kd": 0.07,
+                "Kd": 0.1,
                 "Ki": 0.07
             },
             "5": {
                 "Kp": 0.65,
-                "Kd": 0.08,
+                "Kd": 0.1,
                 "Ki": 0.08
             },
             "10": {
@@ -87,12 +87,17 @@ class Vehicle:
             throttle = -255
         # should now be clipped to -255, 255
         throttle_strong = throttle
-        throttle_weak = int(throttle * (1 - abs(steer)))
+        throttle_weak = int(throttle * ((1 - abs(steer))))
         # byte 0: forward A, byte 1: backward A, byte 2: forward B, byte 3: backward B
         # steer < 0 --> left, steer > 0 --> right
         if debug:
             print(throttle)
         control = []
+        if abs(steer) > 0.5:
+            throttle_strong *= 1.2
+        if abs(steer) > 0.7:
+            throttle_strong *= 1.5
+        throttle_strong = int(throttle_strong)
         if steer > 0:
             if throttle > 0:
                 # for right turn, weaken right-side throttle by factor of 1 - steer
@@ -133,6 +138,7 @@ class Vehicle:
             self.maneuverable_waypoints
         )
         self.rotation = self.sensor.euler
+        rotcp = self.rotation[:]
         # rotation must be in RPY format in radians
         self.rotation = [x * 3.141592/180 for x in self.rotation]
         dt = self.last_time - new_time
@@ -147,14 +153,21 @@ class Vehicle:
 
         waypoint_to_follow = self.lat_pid_controller.get_waypoint_at_offset(self.maneuverable_waypoints,
                                                                             self.current_waypoint_idx, 3)
-        steer = self.lat_pid_controller.run_in_series(
+        steer, error = self.lat_pid_controller.run_in_series(
             self.location, self.rotation, vehicle_speed, waypoint_to_follow
         )
         throttle = deft
+        #if vehicle_speed < 0.05:
+           # throttle = 0.12
         if (vehicle_speed > 0.1):
             throttle = 0
         self.send_signal(self.control_to_bytes(steer, throttle))
-
+        print("Waypoint to follow: " + str(waypoint_to_follow))
+        print("Steer: " + str(steer))
+        print("Speed: " + str(vehicle_speed))
+        print("Signal: " + str(list(self.control_to_bytes(steer, throttle))))
+        print("Rotation: " + str(rotcp))
+        print("Error: " + str(error)) 
         self.location_buffer.append(odom_transform)
         self.last_time = new_time
 
@@ -210,7 +223,7 @@ class LatPIDController():
             np.clip((k_p * error) + (k_d * _de) + (k_i * _ie), self.steering_boundary[0], self.steering_boundary[1])
         )
 
-        return lat_control
+        return lat_control, error
 
     def find_k_values(self, current_speed: float, config: dict) -> np.array:
         k_p, k_d, k_i = 1, 0, 0
