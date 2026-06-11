@@ -23,7 +23,7 @@ import open3d as o3d
 # params
 parser = argparse.ArgumentParser(description='PyICP SLAM arguments')
 
-parser.add_argument('--num_icp_points', type=int, default=2500) # 5000 is enough for real time
+parser.add_argument('--num_icp_points', type=int, default=500) # 5000 is enough for real time
 parser.add_argument('--num_rings', type=int, default=20) # same as the original paper
 parser.add_argument('--num_sectors', type=int, default=60) # same as the original paper
 parser.add_argument('--num_candidates', type=int, default=10) # must be int
@@ -127,10 +127,10 @@ with writer.saving(fig, video_name, num_frames_to_save): # this video saving par
         transformed = transformed.T
         base = base.T
 
-        with open(f"result0/transformed{for_idx}.npz", "wb+") as f:
-            np.save(f, np.array(transformed))
-        with open(f"result0/no_transform{for_idx}.npz", "wb+") as f:
-            np.save(f, np.array(curr_scan_pts))
+        #with open(f"result0/transformed{for_idx}.npz", "wb+") as f:
+        #    np.save(f, np.array(transformed))
+        #with open(f"result0/no_transform{for_idx}.npz", "wb+") as f:
+        #    np.save(f, np.array(curr_scan_pts))
         #with open(f"result0/pose{for_idx}.npz", "wb+") as f:
         #    np.save(f, np.array(PGM.curr_se3))
 
