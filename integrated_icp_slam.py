@@ -6,7 +6,6 @@ import time
 import random
 import argparse
 
-import numpy
 import numpy as np
 np.set_printoptions(precision=4)
 
@@ -34,27 +33,28 @@ parser.add_argument('--data_dir', type=str,
                     default='data/')
 parser.add_argument('--sequence_idx', type=str, default='00')
 parser.add_argument('--save_gap', type=int, default=1)
+parser.add_argument('--icp_tries', type=int, default=50)
+parser.add_argument('--base_result_dir', type=str,
+                    default='POSE/')
+parser.add_argument('--clip_prec', type=int, default=1)
+parser.add_argument('--icp_tolerance', type=float, default=0.00000001)
+parser.add_argument('--target_x', type=float, default=2.5)
+parser.add_argument('--target_y', type=float, default=1.5)
 
-base_result_dir = "POSE/"
-icp_tries = 50
-clip_prec = 1
-icp_tolerance = 0.00000001
-targx = 25
-targy = 15
 args = parser.parse_args()
 
 # Pose Graph Manager (for back-end optimization) initialization
 PGM = PoseGraphManager()
 PGM.addPriorFactor()
 
-def homogenize(victim):
-    m = victim.shape[1]
-    res = np.ones((m + 1, victim.shape[0]))
-    res[:m, :] = np.copy(victim.T)
+def homogenize(pts):
+    m = pts.shape[1]
+    res = np.ones((m + 1, pts.shape[0]))
+    res[:m, :] = np.copy(pts.T)
     return res
 
 # Result saver
-save_dir = base_result_dir + args.sequence_idx
+save_dir = args.base_result_dir + args.sequence_idx
 if not os.path.exists(save_dir): os.makedirs(save_dir)
 ResultSaver = PoseGraphResultSaver(init_pose=PGM.curr_se3,
                              save_gap=args.save_gap,
@@ -68,7 +68,7 @@ SCM = ScanContextManager(shape=[args.num_rings, args.num_sectors],
                                         threshold=args.loop_threshold)
 
 # mapping class
-world = World(clip_prec=clip_prec, start_weight=8, cull_threshold=10000)
+world = World(clip_prec=args.clip_prec, start_weight=8, cull_threshold=10000)
 
 # used to apply controls
 vehicle = Vehicle()
@@ -121,7 +121,7 @@ while True:
         #print("Read & downsampling complete: time since start is " + str(time.process_time() - tstart))
 
         #print("Using custom ICP")
-        odom_transform, dnn, _ = ICP.icp(curr_scan_down_pts, prev_scan_down_pts, init_pose=icp_initial, max_iterations=icp_tries, tolerance=icp_tolerance)
+        odom_transform, dnn, _ = ICP.icp(curr_scan_down_pts, prev_scan_down_pts, init_pose=icp_initial, max_iterations=args.icp_tries, tolerance=args.icp_tolerance)
 
         #print("ICP complete: time since start is " + str(time.process_time() - tstart))
         # update the current (moved) pose
@@ -146,12 +146,14 @@ while True:
         vehicle_pos = [pose[0][3], pose[1][3], pose[2][3]]
         print("Current position: " + str(vehicle_pos))
         if (for_idx < 5 or for_idx % 3 == 0):
+            targx = int(args.target_x * math.pow(10, args.clip_prec))
+            targy = int(args.target_y * math.pow(10, args.clip_prec))
             wpts = world.grid.generateWaypoints(world.clip(pose[0][3]), world.clip(pose[1][3]), targx, targy)
             # wpts = world.grid.generateWaypoints(-20, 50, 24, -14)
             # ideally, slice waypoints ::4 for smoother path
             print(wpts)
 
-            vehicle.replace_waypoints(wpts[::4], clip_prec)
+            vehicle.replace_waypoints(wpts[::4], args.clip_prec)
         vehicle.drive(vehicle_pos)
 
         # renewal the prev information
