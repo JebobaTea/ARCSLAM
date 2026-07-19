@@ -1,7 +1,7 @@
 # Oakton ARC Vehicle Control Core
 Full control loop interfacing with Arduino Nano, YDLidar G4, BNO055, and BTS7960 including map building & path planning capabilities, using Giseop Kim + JustWon et al's PyICP-SLAM for odometry.
 
-See our technical writeup at [COMING SOON].
+Go to the PyICP-SLAM repository [here](https://github.com/gisbi-kim/PyICP-SLAM).
 
 ### Oakton ARC 2026 Engineering Team
 ```sh
